@@ -1,9 +1,10 @@
+import sys
 import praw
 import unicodecsv
-import BuildDatabase
 import datetime
 import re
 from collections import OrderedDict
+from pprint import pprint
 
 # TODO: Keep refactoring. Use more descriptive variable names
 
@@ -26,7 +27,6 @@ def build_database(reddit, youtube):
         # Silently supress errors.
         except KeyError:
             pass
-
     # Output results!
     write_database(unsucky_events)
 
@@ -108,6 +108,7 @@ def process_unsucky_event(youtube, sub_thread, res_thread):
     host = res_thread.author
 
     sub_thread_analytics = get_submissions_from_sub_thread(youtube, sub_thread)
+
     submissions = sub_thread_analytics[0]
     submit_ids = sub_thread_analytics[1]
 
@@ -139,6 +140,7 @@ def get_submissions_from_sub_thread(youtube, sub_thread):
                                   , re.IGNORECASE)
 
     id_set = set()
+    submissions = {}
 
     sub_thread.replace_more_comments(limit=None, threshold=0)
 
@@ -149,11 +151,16 @@ def get_submissions_from_sub_thread(youtube, sub_thread):
         if comment.author and author_blacklist.match(comment.author.name):
             continue
 
-        submissions = get_videos_from_string(youtube, comment)
-        for channel in submissions:
-            for video in submissions[channel]:
-               id_set.add(video['items'][0]['snippet']['id'])
-         
+        submission = get_videos_from_string(youtube, comment.body)
+
+        if len(submission) != 0:
+            channel = submission.keys()[0]
+            submissions[channel] = submission[channel]
+    
+    for channel in submissions:
+        for video in submissions[channel]:
+            id_set.add(video['items'][0]['id'])
+
     return (submissions, id_set)
 
 # Given a string, return a dict of cID's and video titles
@@ -172,10 +179,10 @@ def get_videos_from_string(youtube, string):
         if video['items'] != []:
             channel_title = video['items'][0]['snippet']['channelTitle']
             if channel_title in videos:
-                videos[channel_title].append(entry)
+                videos[channel_title].append(video)
             else:
                 videos[channel_title] = [] 
-                videos[channel_title].append(entry)
+                videos[channel_title].append(video)
 
     return videos 
 
@@ -185,16 +192,16 @@ def get_mentions_from_res_thread(youtube, res_thread, submit_ids):
         desc = res_thread.media['oembed']['description']
         results = get_videos_from_string(youtube, desc)
 
-        prune_results(results[0], submit_ids)
+        prune_results(results, submit_ids)
 
-        if len(results[0]) >= 1:
+        if len(results) >= 1:
             return results
 
     # Results either unsatisfactory from video link
     # or self-post
     results = get_videos_from_string(youtube, res_thread.selftext)
-    results_video = prune_results(results[0], submit_ids)
-    if len(results[0]) >= 1:
+    results_video = prune_results(results, submit_ids)
+    if len(results) >= 1:
         return results   
 
     # Else, the results video, crack open it's description, and do the exact same thing
@@ -202,9 +209,9 @@ def get_mentions_from_res_thread(youtube, res_thread, submit_ids):
         desc = results_video['items'][0]['snippet']['description']
         results = get_videos_from_string(youtube, desc)
 
-        prune_results(results[0], submit_ids)
+        prune_results(results, submit_ids)
 
-        if len(results[0]) >= 1:
+        if len(results) >= 1:
             return results
 
     return {}
@@ -251,7 +258,7 @@ def write_database(unsucky_events):
             videos = []
 
             for video in event_info[4][channel]:
-                videos.append(video)
+                videos.append(video['items'][0]['snippet']['title'])
 
             unsuckywriter.writerow([channel] + videos)
 

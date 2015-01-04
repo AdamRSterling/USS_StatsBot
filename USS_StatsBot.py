@@ -6,11 +6,11 @@ from AnalyzeDatabase import analyze_database
 import apiclient.discovery
 
 def main():
-    build = False 
+    build = True
     analyze = True
     
     # Login to Reddit
-    reddit = praw.Reddit(user_agent='USS_Stats 0.8.5 by u/birdcatchergames')
+    reddit = praw.Reddit(user_agent='USS_Stats 0.8.5.1 by u/birdcatchergames')
     reddit.login(AccountDetails.USS_STATS_UNAME, AccountDetails.USS_STATS_PWORD)
 
     # Login to YouTube
