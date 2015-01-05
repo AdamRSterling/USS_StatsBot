@@ -1,105 +1,46 @@
 import unicodecsv
+import FileDetails
+import os
+from bokeh.charts import TimeSeries
+import datetime
 
-# TODO: Refactor module completely.
-# TODO: Split function into helper functions
-# TODO: Document code
+def analyze_databases():
+    analyze_USS_database()
+#    analyze_channel_database()
 
-# This is pretty raw code. Read the master database and create
-# smaller analytical databases
-def analyze_database():
-    database = unicodecsv.reader(open('USSDatabase.csv', 'rb'), delimiter=',')
+def analyze_USS_database():
+    file_path = FileDetails.DATA_DIR + '/' + FileDetails.USS_DATABASE_FILENAME
+    if not os.path.exists(file_path):
+        print "Cannot find database!"
+        return
 
-    channels = {}
+    uss_database = unicodecsv.DictReader(open(file_path, 'rb'))
+    plot_submissions_over_time(uss_database)
 
-    total_events = 0
-    total_submittors = 0
-    total_mentions = 0
+def plot_submissions_over_time(uss_database):
+    sub_counts = []
+    events = []
+    for event in uss_database:
+        sub_counts.append(int(event['# of Submissions']))
+        date = event['Date'].split('-')
 
-    for uss_event in database:
-        total_events += 1
-        event = uss_event[0]
-        date = database.next()[1]
-        host = database.next()[1]
-        status = database.next()[1]
-        number_of_submissions = int(database.next()[1])
-
-        total_submittors += number_of_submissions
+        events.append(datetime.date(int(date[0]), int(date[1]), int(date[2])))
         
-        # Burn row
-        database.next()
-        for i in range(0, number_of_submissions):
-            submission_row = database.next()
-            channel = submission_row[0]
+    # Put down data    
+    plot = TimeSeries(sub_counts, events)
+    
+    # label the plot
+    plot.title("Submissions over Time").xlabel("Date").ylabel("# of Submissions")
+    
+    # Save the plot
+    plot.filename('test.html')
+def analyze_channel_database():
+    file_path = FileDetails.DATA_DIR + '/' + FileDetails.CHANNEL_DATABASE_FILENAME
+    if not os.path.exists(file_path):
+        print "Cannot find database!"
+        return
 
-            if channel not in channels:
-                channel_stats = {}
-                channel_stats['Num Subs'] = 0
-                channel_stats['Submissions'] = []
-                channel_stats['Num Mentions'] = 0
-                channel_stats['Mentioned'] = []
-
-                channels[channel] = channel_stats
-
-            channel_stats = channels[channel]
-            channel_stats['Num Subs'] += 1 
-
-            for video in submission_row[1:]:
-                if video not in channel_stats['Submissions']:
-                    channel_stats['Submissions'].append(video)
-
-        # Burn row
-        database.next()
-        for row in database:
-            if len(row) == 0:
-                break
-
-            total_mentions += 1
-            channel = row[0]
-            channel_stats = channels[channel]
-            
-            channel_stats['Num Mentions'] += 1
-            channel_stats['Mentioned'].append(row[1])
-
-    # Write USS_Event statistics
-    uss_sheet = unicodecsv.writer(open('USSStatistics.csv', 'wb'), delimiter=',', quoting=unicodecsv.QUOTE_MINIMAL)
-    uss_sheet.writerow(['Number of USS Events'] + [total_events])
-    uss_sheet.writerow(['Average # of Participants'] + [float(total_submittors)/total_events])
-    uss_sheet.writerow(['Total # of Mentions'] + [total_mentions])
-    uss_sheet.writerow(['Average # of Mentions'] + [float(total_mentions)/total_events])
-
-    # Write channel statistics
-    channels_sheet = unicodecsv.writer(open('ChannelDatabase.csv', 'wb'), delimiter=',', quoting=unicodecsv.QUOTE_MINIMAL)
-    header = ['Channel'] + ['# of Submissions'] + ['# of Mentions'] + \
-             ['Mention Percentage'] + ['Submitted Videos'] + \
-             ['Mentioned Videos']
-
-    channels_sheet.writerow(header)
-
-    channel_count = 0
-    total_submissions = 0
-    total_mentions = 0
-    total_percentage = 0.0
-
-    for channel in sorted(channels):
-        channel_count += 1
-        total_submissions += channel_stats['Num Subs']
-
-        total_mentions += channel_stats['Num Mentions']
-        channel_stats = channels[channel]
-
-        percentage = float(channel_stats['Num Mentions']) / float(channel_stats['Num Subs']) 
-
-        total_percentage += percentage
-
-        channels_sheet.writerow([channel] + [channel_stats['Num Subs']] +
-                                [channel_stats['Num Mentions']] +
-                                [percentage] +
-                                [channel_stats['Submissions']] +
-                                [channel_stats['Mentioned']])
-
-    channels_sheet.writerow([])
-    channels_sheet.writerow(['Total Channels'] + [channel_count])
-    channels_sheet.writerow(['Total Submissions'] + [total_submissions])
-    channels_sheet.writerow(['Average # of Submissions'] + [total_submissions / float(channel_count)])
-    channels_sheet.writerow(['Average # of Mentions'] + [total_mentions / float(channel_count)])
-    channels_sheet.writerow(['Average Percentage'] + [total_percentage / total_submissions])
+    channel_database = unicodecsv.DictReader(open(file_path, 'rb'))
+    
+    for channel in channel_database:
+        print channel['Channel']

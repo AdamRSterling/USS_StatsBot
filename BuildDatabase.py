@@ -1,10 +1,8 @@
-import sys
 import praw
-import unicodecsv
 import datetime
 import re
 from collections import OrderedDict
-from pprint import pprint
+from WriteDatabase import write_databases
 
 # TODO: Keep refactoring. Use more descriptive variable names
 
@@ -27,8 +25,9 @@ def build_database(reddit, youtube):
         # Silently supress errors.
         except KeyError:
             pass
+    
     # Output results!
-    write_database(unsucky_events)
+    write_databases(unsucky_events)
 
 # Returns a map of dates to submission threads
 def get_sub_threads(reddit):
@@ -125,7 +124,17 @@ def process_unsucky_event(youtube, sub_thread, res_thread):
     # Tuple of host, sub_thread, res_thread, set of submit tuples,
     # number of submissions, and set of mentioned submits
     num_subs = len(submissions)
-    return (host, sub_thread, res_thread, num_subs, submissions, res_thread_analytics, status)
+
+    event_info = {}
+    event_info['Host'] = host
+    event_info['Sub_thread'] = sub_thread
+    event_info['Res_thread'] = res_thread
+    event_info['Number of Submissions'] = num_subs
+    event_info['Submissions'] = submissions
+    event_info['Mentions'] = res_thread_analytics
+    event_info['Status'] = status
+
+    return [event_info]
 
 
 # Given a list of comments, discriminate on submissions and parse out videoID
@@ -238,39 +247,3 @@ def prune_results(results, submit_ids):
         del results[channel]
 
     return results_video
-
-def write_database(unsucky_events):
-    unsuckywriter = unicodecsv.writer(open('USSDatabase.csv', 'wb'),
-                               delimiter=',', quoting=unicodecsv.QUOTE_MINIMAL)
-
-    counter = 0
-    for event in unsucky_events:
-        event_info = unsucky_events[event]
-        counter += 1
-        unsuckywriter.writerow(['Unsucky Sunday #' + str(counter)])
-        unsuckywriter.writerow(['Date'] + [str(event)])
-        unsuckywriter.writerow(['Host'] + [event_info[0]])
-        unsuckywriter.writerow(['Status'] + [event_info[6]])
-        unsuckywriter.writerow(['Number of Submissions'] + [str(event_info[3])])
-        unsuckywriter.writerow(['Submissions'])
-
-        for channel in event_info[4]:
-            videos = []
-
-            for video in event_info[4][channel]:
-                videos.append(video['items'][0]['snippet']['title'])
-
-            unsuckywriter.writerow([channel] + videos)
-
-        unsuckywriter.writerow(['Mentions'])
-
-        for channel in event_info[5]:
-            videos = []
-
-            for video in event_info[5][channel]:
-                title = video['items'][0]['snippet']['title']
-                videos.append(title)
-
-            unsuckywriter.writerow([channel] + videos)
-
-        unsuckywriter.writerow([])
